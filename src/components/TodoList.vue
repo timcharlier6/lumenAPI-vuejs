@@ -1,36 +1,56 @@
 <template>
-  <div>
-	<div class="header" id="myDIV">
+	<div>
+		<div v-if="!token">
+			<h2 v-if="isRegister">Sign Up</h2>
+			<h2 v-else>Log In</h2>
 
-    <h1>Todo List</h1>
+			<input v-model="name" placeholder="Name">
+			<input v-model="password" type="password" placeholder="Password">
+			<button @click="isRegister ? register() : login()">
+				{{ isRegister ? "Sign Up" : "Log In" }}
+			</button>
+			<p @click="isRegister = !isRegister" style="cursor:pointer; color:blue">
+			{{ isRegister ? "Already have an account? Log In" : "New user? Sign Up" }}
+			</p>
+		</div>
+		<div v-else>
 
-    <input type="text" id="myInput" v-model="newTodoTitle" placeholder="Title..." />
-    <span class="addBtn" @click="addTodo">Add</span>
+			<div class="header" id="myDIV">
+
+				<h1>My Todo List</h1>
+
+				<input type="text" id="myInput" v-model="newTodoTitle" placeholder="Title..." />
+				<span class="addBtn" @click="addTodo">Add</span>
+			</div>
+			<div>
+				<input v-model="password" type="password" placeholder="Password">
+				<button @click="login">Login</button>
+			</div>
+			<p v-if="loading">Loading...</p>
+			<ul id="myUL" v-else>
+				<li
+						v-for="todo in todos"
+						:key="todo.id"
+						:data-id="todo.id"
+						:data-completed="todo.completed"
+						:class="{ checked: todo.completed }"
+						@click="toggleCompleted(todo)"
+						@dblclick="editTodo(todo)"
+						>
+						<span v-if="editingTodoId !== todo.id">{{ todo.title }}</span>
+						<input
+								v-else
+								type="text"
+								v-model="editedTitle"
+								@blur="saveTodo(todo)"
+								@keyup.enter="saveTodo(todo)"
+								ref="editInput"
+								/>
+						<span class="close" @click.stop="deleteTodo(todo.id)">&#xD7;</span>
+				</li>
+			</ul>
+		</div>
 	</div>
-    <p v-if="loading">Loading...</p>
-    <ul id="myUL" v-else>
-      <li
-        v-for="todo in todos"
-        :key="todo.id"
-        :data-id="todo.id"
-        :data-completed="todo.completed"
-        :class="{ checked: todo.completed }"
-        @click="toggleCompleted(todo)"
-        @dblclick="editTodo(todo)"
-      >
-        <span v-if="editingTodoId !== todo.id">{{ todo.title }}</span>
-        <input
-          v-else
-          type="text"
-          v-model="editedTitle"
-          @blur="saveTodo(todo)"
-          @keyup.enter="saveTodo(todo)"
-          ref="editInput"
-        />
-        <span class="close" @click.stop="deleteTodo(todo.id)">&#xD7;</span>
-      </li>
-    </ul>
-  </div>
 </template>
 
 <script setup>
@@ -41,16 +61,16 @@ const todos = ref([]);
 const loading = ref(true);
 const newTodoTitle = ref('');
 const editingTodoId = ref(null);
-const editedTitle = ref('');
-const editInput = ref(null);
+const token = ref(localStorage.getItem('token' || ''));
+
 
 onMounted(() => {
-  fetchTodos();
+  if (token.value) fetchTodos();
 });
 
 const fetchTodos = () => {
   loading.value = true;
-  axios.get('http://localhost:8000/todos')
+  axios.get('http://localhost:8000/todos', { headers: authHeader() })
     .then(response => {
       todos.value = response.data;
       nextTick(()=>{loading.value = false;});
@@ -63,23 +83,23 @@ const fetchTodos = () => {
 
 const addTodo = () => {
   if (newTodoTitle.value.trim()) {
-    axios.post('http://localhost:8000/todos', { title: newTodoTitle.value })
+    axios.post('http://localhost:8000/todos', { title: newTodoTitle.value },  { headers: authHeader() })
       .then(() => {
-        newTodoTitle.value = '';
-        fetchTodos();
+	newTodoTitle.value = '';
+	fetchTodos();
       })
       .catch(error => {
-        console.error('Error adding todo:', error);
+	console.error('Error adding todo:', error);
       });
   }
 };
 
 const toggleCompleted = (todo) => {
   axios
-    .put(`http://localhost:8000/todos/${todo.id}`, {
-      ...todo,
-      completed: !todo.completed,
-    })
+    .put(`http://localhost:8000/todos/${todo.id}`, 
+      {completed: !todo.completed},
+	 { headers: authHeader() }
+    )
     .then(() => {
       fetchTodos();
     })
@@ -90,7 +110,7 @@ const toggleCompleted = (todo) => {
 
 const deleteTodo = (id) => {
   axios
-    .delete(`http://localhost:8000/todos/${id}`)
+    .delete(`http://localhost:8000/todos/${id}`, { headers: authHeader() })
     .then(() => {
       fetchTodos();
     })
@@ -99,28 +119,14 @@ const deleteTodo = (id) => {
     });
 };
 
-const editTodo = (todo) => {
-  editingTodoId.value = todo.id;
-  editedTitle.value = todo.title;
-  nextTick(() => {
-    if (editInput.value) {
-      editInput.value.focus();
-    }
-  });
-};
 
-const saveTodo = (todo) => {
-  editingTodoId.value = null;
-  axios
-    .put(`http://localhost:8000/todos/${todo.id}`, {
-      ...todo,
-      title: editedTitle.value,
-    })
-    .then(() => {
-      fetchTodos();
-    })
-    .catch((error) => {
-      console.error('Error updating todo:', error);
-    });
+const authHeader = () => ({
+	Authorization: `Bearer ${token.value}`,
+});
+
+
+const logout = () => {
+	token.value = '';
+	localStorage.removeItem('token');
 };
 </script>
