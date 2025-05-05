@@ -10,8 +10,7 @@ use App\Models\Todo;
 class TodoController extends BaseController
 {
 	public function index() {
-		$todos =  Todo::all();
-		return response()->json($todos);
+		return response()->json(auth()->user()->todos);
 	}
 
 	public function store(Request $request) {
@@ -22,7 +21,7 @@ class TodoController extends BaseController
 		if ($validator->fails()) {
 			return response()->json(['errors' => $validator->errors()], 422);
 		}
-		$todo = Todo::create([
+		$todo = auth()->user()->todos()->create([
 			'title' => $request->title,
 			'completed' => $request->completed ?? false,
 		]);
@@ -32,7 +31,18 @@ class TodoController extends BaseController
 
 
 	public function update(Request $request, $id) {
-		$todo = Todo::findOrFail($id);
+		$validator = Validator::make($request->all(), [
+			'completed' => 'required|boolean',
+		]);
+
+		if ($validator->fails()) {
+			return response()->json(['errors' => $validator->errors()], 422);
+		}
+		$todo = auth()->user()->todos()->find($id);
+		if (!$todos) {
+
+			return response()->json(['error' => 'Todo not found or unauthorized'], 403);
+		}
 		$todo->update([
 			'completed' => $request->completed,
 		]);

@@ -17,7 +17,13 @@ $router->get('/', function () use ($router) {
     return $router->app->version();
 });
 
-$router->get('/todos', 'TodoController@index');
-$router->post('/todos', 'TodoController@store');
-$router->put('/todos/{id}', 'TodoController@update');
-$router->delete('/todos/{id}', 'TodoController@destroy');
+$router->post('/register', 'AuthController@register');
+$router->post('/login', 'AuthController@login');
+
+$router->group(['middleware' => 'auth'], function () use ($router) {
+	$router->get('/me', 'AuthController@me');
+	$router->get('/todos', 'TodoController@index');
+	$router->post('/todos', 'TodoController@store');
+	$router->put('/todos/{id}', 'TodoController@update');
+	$router->delete('/todos/{id}', 'TodoController@destroy');
+});
